@@ -1,4 +1,4 @@
-![Banner Image](https://github.com/user-attachments/assets/f5438c2d-9d9e-4863-b9e4-7e66202fe9c5)
+![Banner Image](https://github.com/user-attachments/assets/4d31e977-018f-47cc-86f5-2caff3fae1d7)
 
 # n8n-nodes-gotohuman
 
@@ -12,6 +12,7 @@ Many built-in features:
 	- Inbox
 	- Customizable review interface
 	- Controls to approve, reject, or edit AI outputs
+	- Allow retries with instructions
 	- Supports text, markdown, JSON, images, and more
 - Slack integration
 - Notifications
