@@ -1,0 +1,22 @@
+{
+	"node": "n8n-nodes-base.gotohuman",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Communication", "HITL"],
+	"subcategories": {
+		"HITL": ["Human in the Loop"]
+	},
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://docs.gotohuman.com/Integrations/n8n"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://docs.gotohuman.com/Integrations/n8n"
+			}
+		]
+	},
+	"alias": ["human", "form", "wait", "hitl", "approval", "review", "human-in-the-loop", "ai", "llm"]
+}
