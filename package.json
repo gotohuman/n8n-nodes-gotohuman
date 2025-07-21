@@ -1,6 +1,6 @@
 {
   "name": "@gotohuman/n8n-nodes-gotohuman",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "n8n node to request human reviews in AI workflows with gotoHuman",
   "keywords": [
     "n8n-community-node-package",
