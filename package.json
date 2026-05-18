@@ -8,8 +8,10 @@
     "n8n",
     "human-in-the-loop",
     "AI",
-		"reviews",
-		"approvals"
+    "human review",
+    "human approval",
+    "reviews",
+    "approvals"
   ],
   "license": "MIT",
   "homepage": "https://www.gotohuman.com",
@@ -45,7 +47,8 @@
       "dist/credentials/GotoHumanApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/GotoHuman/GotoHuman.node.js"
+      "dist/nodes/GotoHuman/GotoHuman.node.js",
+      "dist/nodes/GotoHuman/GotoHumanTrigger.node.js"
     ]
   },
   "devDependencies": {
@@ -53,6 +56,7 @@
     "eslint": "^8.57.0",
     "eslint-plugin-n8n-nodes-base": "^1.16.3",
     "gulp": "^5.0.0",
+    "n8n-workflow": "^2.16.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2"
   },

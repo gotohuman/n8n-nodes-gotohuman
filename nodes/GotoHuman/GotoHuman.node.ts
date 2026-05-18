@@ -1,7 +1,6 @@
-import { INodeType, INodeTypeDescription, NodeConnectionType, ILoadOptionsFunctions, INodeListSearchResult, IRequestOptions, NodeOperationError, ResourceMapperFields, IDataObject, jsonParse, ResourceMapperField, ResourceMapperValue, IWebhookFunctions, IWebhookResponseData, IExecuteFunctions, NodeApiError } from 'n8n-workflow';
+import { INodeType, INodeTypeDescription, NodeConnectionTypes, ILoadOptionsFunctions, INodeListSearchResult, IHttpRequestOptions, NodeOperationError, ResourceMapperFields, IDataObject, jsonParse, ResourceMapperField, ResourceMapperValue, IWebhookFunctions, IWebhookResponseData, IExecuteFunctions, NodeApiError } from 'n8n-workflow';
 
 const BASE_URL = 'https://api.gotohuman.com';
-const VERSION = 1;
 
 export class GotoHuman implements INodeType {
 	description: INodeTypeDescription = {
@@ -9,14 +8,18 @@ export class GotoHuman implements INodeType {
 		name: 'gotoHuman',
 		icon: 'file:gotohuman.svg',
 		group: ['transform'],
-		version: VERSION,
+		version: [1, 2],
+		features: {
+			sendRawReviewData: { '@version': [{ _cnd: { gte: 2 } }] },
+		},
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description: 'Request human reviews with gotoHuman',
 		defaults: {
 			name: 'gotoHuman',
 		},
-		inputs: [NodeConnectionType.Main],
-		outputs: [NodeConnectionType.Main],
+		usableAsTool: true,
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [
 			{
 				name: 'gotoHumanApi',
@@ -55,15 +58,27 @@ export class GotoHuman implements INodeType {
 				name: 'operation',
 				type: 'options',
 				noDataExpression: true,
-				options: [
-					{
-						name: 'Send and Wait for Response',
-						value: 'sendAndWait',
-						action: 'Send review request and wait for response',
-						description: 'Request a human review and wait for the response',
-					},
-				],
-				default: 'sendAndWait',
+			options: [
+				{
+					name: 'Send',
+					value: 'send',
+					action: 'Send review request',
+					description: 'Request a human review',
+				},
+			{
+				name: 'Send and Wait for Response',
+				value: 'sendAndWait',
+				action: 'Send review request and wait for response',
+				description: 'Request a human review and wait for the response',
+			},
+			{
+				name: 'Delete',
+				value: 'delete',
+				action: 'Delete review request',
+				description: 'Delete an existing review request',
+			},
+		],
+			default: 'sendAndWait',
 				displayOptions: {
 					show: {
 						resource: [
@@ -102,9 +117,10 @@ export class GotoHuman implements INodeType {
 						resource: [
 							'reviewRequest',
 						],
-						operation: [
-							'sendAndWait',
-						],
+					operation: [
+						'send',
+						'sendAndWait',
+					],
 					},
 				},
 			},
@@ -131,17 +147,51 @@ export class GotoHuman implements INodeType {
 						supportAutoMap: false,
 					},
 				},
-				displayOptions: {
-					show: {
-						resource: ['reviewRequest'],
-						operation: ['sendAndWait'],
-					},
-					hide: { reviewTemplateID: [''] },
+			displayOptions: {
+				show: {
+					resource: ['reviewRequest'],
+					operation: ['send', 'sendAndWait'],
+					'@feature': [{ _cnd: { not: 'sendRawReviewData' } }],
 				},
+				hide: { reviewTemplateID: [''] },
 			},
-			{
-				displayName: 'Meta Data',
-				name: 'metaSelect',
+		},
+		{
+			displayName: 'Review Data',
+			name: 'reviewData',
+			type: 'json',
+			required: true,
+			default: '',
+			placeholder: 'e.g. {"property1": "value1"}',
+			description: 'The data to populate the review template',
+			displayOptions: {
+				show: {
+					resource: ['reviewRequest'],
+					operation: ['send', 'sendAndWait'],
+					'@feature': ['sendRawReviewData'],
+				},
+				hide: { reviewTemplateID: [''] },
+			},
+		},
+		{
+			displayName: 'Review Config',
+			name: 'reviewConfig',
+			type: 'json',
+			default: '{}',
+			placeholder: 'e.g. {"fields": { "myField1": { ... } }}',
+			description: "Can optionally be used to dynamically configure your review and its fields",
+			displayOptions: {
+				show: {
+					resource: ['reviewRequest'],
+					operation: ['send', 'sendAndWait'],
+					'@feature': ['sendRawReviewData'],
+				},
+				hide: { reviewTemplateID: [''] },
+			},
+		},
+		{
+			displayName: 'Meta Data',
+			name: 'metaSelect',
 				description: 'Select if you want to add meta data that you want to receive back in the response webhook',
 				required: true,
 				type: 'options',
@@ -163,7 +213,7 @@ export class GotoHuman implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['reviewRequest'],
-						operation: ['sendAndWait'],
+						operation: ['send', 'sendAndWait'],
 					},
 					hide: { reviewTemplateID: [''] },
 				},
@@ -177,7 +227,7 @@ export class GotoHuman implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['reviewRequest'],
-						operation: ['sendAndWait'],
+						operation: ['send', 'sendAndWait'],
 						metaSelect: ['json'],
 					},
 					hide: { reviewTemplateID: [''] },
@@ -219,7 +269,7 @@ export class GotoHuman implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['reviewRequest'],
-						operation: ['sendAndWait'],
+						operation: ['send', 'sendAndWait'],
 						metaSelect: ['keyValue'],
 					},
 					hide: { reviewTemplateID: [''] },
@@ -245,7 +295,7 @@ export class GotoHuman implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['reviewRequest'],
-						operation: ['sendAndWait'],
+						operation: ['send', 'sendAndWait'],
 					},
 					hide: { reviewTemplateID: [''] },
 				},
@@ -281,10 +331,25 @@ export class GotoHuman implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['reviewRequest'],
-						operation: ['sendAndWait'],
+						operation: ['send', 'sendAndWait'],
 						assignToSelect: ['selectByEmail'],
 					},
 					hide: { reviewTemplateID: [''] },
+				},
+			},
+			{
+				displayName: 'Review ID',
+				name: 'reviewId',
+				type: 'string',
+				required: true,
+				default: '',
+				placeholder: 'e.g. 123456',
+				description: 'The ID of the review request to delete',
+				displayOptions: {
+					show: {
+						resource: ['reviewRequest'],
+						operation: ['delete'],
+					},
 				},
 			},
 			{
@@ -296,11 +361,33 @@ export class GotoHuman implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['reviewRequest'],
-						operation: ['sendAndWait'],
+						operation: ['send', 'sendAndWait'],
 					},
 					hide: { reviewTemplateID: [''] },
 				},
 				options: [
+					{
+						displayName: 'Title',
+						name: 'title',
+						type: 'string',
+						default: '',
+						description: 'Set a title for this review request. Read more about it <a href="https://docs.gotohuman.com/send-requests">here</a>.',
+					},
+					{
+						displayName: 'Auto Approve',
+						name: 'autoApprove',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to automatically approve this request. Read more about it <a href="https://docs.gotohuman.com/send-requests">here</a>.',
+					},
+					{
+						displayName: 'Workflow Info',
+						name: 'workflow',
+						type: 'json',
+						default: '',
+						placeholder: '{"runId": "123456", "runName": "My Workflow", "prevSteps": ["1234567890"]}',
+						description: 'Send to connect multiple review steps. Read more about it <a href="https://docs.gotohuman.com/send-requests#workflow-metadata">here</a>.',
+					},
 					{
 						displayName: 'Update for Review ID',
 						name: 'updateForReviewId',
@@ -329,9 +416,9 @@ export class GotoHuman implements INodeType {
 					forms: ReviewTemplateForm[];
 				}
 
-				const options: IRequestOptions = {
+				const options: IHttpRequestOptions = {
 					method: 'GET',
-					uri: `${BASE_URL}/fetchN8nForms`,
+					url: `${BASE_URL}/fetchN8nForms`,
 					json: true,
 				};
 
@@ -368,9 +455,9 @@ export class GotoHuman implements INodeType {
 
 				const { value: reviewTemplateID } = reviewTemplateObj;
 
-				const options: IRequestOptions = {
+				const options: IHttpRequestOptions = {
 					method: 'GET',
-					uri: `${BASE_URL}/fetchN8nFields`,
+					url: `${BASE_URL}/fetchN8nFields`,
 					qs: {
 						formId: reviewTemplateID,
 					},
@@ -394,15 +481,58 @@ export class GotoHuman implements INodeType {
 	async execute(this: IExecuteFunctions) {
 		const items = this.getInputData();
 		const returnData = [];
+		const resource = this.getNodeParameter('resource', 0) as string;
+		const operation = this.getNodeParameter('operation', 0) as string;
 		// Determine wait timeout
 		let waitMillis: number = 14 * 24 * 60 * 60 * 1000; // 14 days default
 		for (let i = 0; i < items.length; i++) {
 			try {
-				const resource = this.getNodeParameter('resource', i) as string;
-				const operation = this.getNodeParameter('operation', i) as string;
-				if (resource === 'reviewRequest' && operation === 'sendAndWait') {
+				if (resource === 'reviewRequest' && (operation === 'sendAndWait' || operation === 'send')) {
 					const reviewTemplateID = this.getNodeParameter('reviewTemplateID', i) as IDataObject;
-					const fieldsParam = this.getNodeParameter('fields', i) as ResourceMapperValue;
+					const useSendRawReviewData = this.isNodeFeatureEnabled('sendRawReviewData');
+					let parsedFields: IDataObject;
+					let parsedConfig: IDataObject | undefined;
+				if (useSendRawReviewData) {
+					const reviewDataRaw = this.getNodeParameter('reviewData', i);
+					if (typeof reviewDataRaw === 'string') {
+						try {
+							parsedFields = jsonParse(reviewDataRaw);
+						} catch (error) {
+							throw new NodeOperationError(this.getNode(), 'reviewData is not valid JSON', error);
+						}
+					} else {
+						parsedFields = reviewDataRaw as IDataObject;
+					}
+					const reviewConfigRaw = this.getNodeParameter('reviewConfig', i);
+					if (reviewConfigRaw) {
+						if (typeof reviewConfigRaw === 'string') {
+							try {
+								parsedConfig = jsonParse(reviewConfigRaw);
+							} catch (error) {
+								throw new NodeOperationError(this.getNode(), 'reviewConfig is not valid JSON', error);
+							}
+						} else {
+							parsedConfig = reviewConfigRaw as IDataObject;
+						}
+					}
+				} else {
+						const fieldsParam = this.getNodeParameter('fields', i) as ResourceMapperValue;
+						parsedFields = { ...(fieldsParam.value || {}) };
+						const schemaList = fieldsParam.schema;
+						// Prepare fields for body, parsing array/object types as JSON if needed
+						if (fieldsParam.value && schemaList) {
+							for (const field of schemaList) {
+								const val = fieldsParam.value[field.id];
+								if ((field.type === 'array' || field.type === 'object') && typeof val === 'string') {
+									try {
+										parsedFields[field.id] = jsonParse(val);
+									} catch (err) {
+										throw new NodeOperationError(this.getNode(), `Could not parse field '${field.id}' as JSON: ${val}`);
+									}
+								}
+							}
+						}
+					}
 					const metaSelect = this.getNodeParameter('metaSelect', i) as string;
 					let meta: any = undefined;
 					if (metaSelect === 'json') {
@@ -432,39 +562,35 @@ export class GotoHuman implements INodeType {
 						}
 					}
 					const additionalFields = this.getNodeParameter('additionalFields', i) as IDataObject;
-					// Prepare fields for body, parsing array/object types as JSON if needed
-					const schemaList = fieldsParam.schema;
-					let parsedFields = { ...(fieldsParam.value || {}) };
-					if (fieldsParam.value && schemaList) {
-						for (const field of schemaList) {
-							const val = fieldsParam.value[field.id];
-							if ((field.type === 'array' || field.type === 'object') && typeof val === 'string') {
-								try {
-									parsedFields[field.id] = jsonParse(val);
-								} catch (err) {
-									throw new NodeOperationError(this.getNode(), `Could not parse field '${field.id}' as JSON: ${val}`);
-								}
-							}
-						}
-					}
 					const body: any = {
 						formId: reviewTemplateID.value,
 						fields: parsedFields,
 						origin: 'n8n',
-						originV: VERSION,
+						originV: this.getNode().typeVersion,
 					};
+					if (parsedConfig !== undefined) body.config = parsedConfig;
 					if (meta !== undefined) body.meta = meta;
 					if (assignTo !== undefined) body.assignTo = assignTo;
-					if (additionalFields && additionalFields.updateForReviewId) {
+					if (additionalFields?.title) body.title = additionalFields.title;
+					if (additionalFields?.autoApprove !== undefined) body.autoApprove = additionalFields.autoApprove;
+					if (additionalFields?.workflow) {
+						try {
+							body.workflow = jsonParse(additionalFields.workflow as string);
+						} catch {
+							throw new NodeOperationError(this.getNode(), 'workflow field is not valid JSON');
+						}
+					}
+					if (additionalFields?.updateForReviewId) {
 						body.updateForReviewId = additionalFields.updateForReviewId;
 					}
-					// Add webhookData
+				if (operation === 'sendAndWait') {
 					const resumeUrl = this.evaluateExpression('{{ $execution?.resumeUrl }}', i) as string;
 					const nodeId = this.evaluateExpression('{{ $nodeId }}', i) as string;
 					body.webhookUrl = `${resumeUrl}/${nodeId}`;
-					const options: IRequestOptions = {
+				}
+					const options: IHttpRequestOptions = {
 						method: 'POST',
-						uri: `${BASE_URL}/requestReview`,
+						url: `${BASE_URL}/requestReview`,
 						body,
 						json: true,
 					};
@@ -485,9 +611,23 @@ export class GotoHuman implements INodeType {
 						throw error;
 					}
 					returnData.push({ json: responseData });
-				} else {
-					throw new NodeOperationError(this.getNode(), `The operation ${operation} is not supported!`);
+			} else if (resource === 'reviewRequest' && operation === 'delete') {
+				const reviewId = this.getNodeParameter('reviewId', i) as string;
+				const options: IHttpRequestOptions = {
+					method: 'DELETE',
+					url: `${BASE_URL}/deleteReview`,
+					body: { reviewId },
+					json: true,
+				};
+				try {
+					const responseData = await this.helpers.requestWithAuthentication.call(this, 'gotoHumanApi', options);
+					returnData.push({ json: responseData ?? { success: true } });
+				} catch (error) {
+					throw error;
 				}
+			} else {
+				throw new NodeOperationError(this.getNode(), `The operation ${operation} is not supported!`);
+			}
 			} catch (err) {
 				if (this.continueOnFail()) {
 					returnData.push({ json: { error: err.message }, error: err });
@@ -497,9 +637,12 @@ export class GotoHuman implements INodeType {
 			}
 		}
 
-		const waitTill = new Date(new Date().getTime() + waitMillis);
-		await this.putExecutionToWait(waitTill);
-		return [this.getInputData()];
+		if (operation === 'sendAndWait') {
+			const waitTill = new Date(new Date().getTime() + waitMillis);
+			await this.putExecutionToWait(waitTill);
+			return [this.getInputData()];
+		}
+		return [returnData];
 	}
 
 	webhook = async function(this: IWebhookFunctions): Promise<IWebhookResponseData> {
