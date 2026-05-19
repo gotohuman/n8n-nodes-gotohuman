@@ -1,6 +1,6 @@
-import { INodeType, INodeTypeDescription, NodeConnectionTypes, ILoadOptionsFunctions, INodeListSearchResult, IHttpRequestOptions, NodeOperationError, ResourceMapperFields, IDataObject, jsonParse, ResourceMapperField, ResourceMapperValue, IWebhookFunctions, IWebhookResponseData, IExecuteFunctions, NodeApiError } from 'n8n-workflow';
+import { INodeType, INodeTypeDescription, NodeConnectionTypes, ILoadOptionsFunctions, INodeListSearchResult, IHttpRequestOptions, NodeOperationError, ResourceMapperFields, IDataObject, jsonParse, ResourceMapperField, ResourceMapperValue, IWebhookFunctions, IWebhookResponseData, IExecuteFunctions, NodeApiError, JsonObject } from 'n8n-workflow';
 
-const BASE_URL = 'https://api.gotohuman.com';
+import { BASE_URL, gotoHumanWebhookMethods } from './helpers';
 
 export class GotoHuman implements INodeType {
 	description: INodeTypeDescription = {
@@ -422,7 +422,7 @@ export class GotoHuman implements INodeType {
 					json: true,
 				};
 
-				const reviewTemplates: ReviewTemplatesResponse = await this.helpers.requestWithAuthentication.call(this, 'gotoHumanApi', options);
+				const reviewTemplates: ReviewTemplatesResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
 
 				if (reviewTemplates === undefined) {
 					throw new NodeOperationError(this.getNode(), 'No review templates found. Please create one first in our web app.');
@@ -464,7 +464,7 @@ export class GotoHuman implements INodeType {
 					json: true,
 				};
 
-				const templateFieldsResponse: ReviewTemplateFieldsResponse = await this.helpers.requestWithAuthentication.call(this, 'gotoHumanApi', options);
+				const templateFieldsResponse: ReviewTemplateFieldsResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
 
 				if (templateFieldsResponse?.fields === undefined) {
 					throw new NodeOperationError(this.getNode(), 'No fields found for review template. Please add some fields in our web editor first.');
@@ -526,15 +526,15 @@ export class GotoHuman implements INodeType {
 								if ((field.type === 'array' || field.type === 'object') && typeof val === 'string') {
 									try {
 										parsedFields[field.id] = jsonParse(val);
-									} catch (err) {
-										throw new NodeOperationError(this.getNode(), `Could not parse field '${field.id}' as JSON: ${val}`);
+									} catch {
+										throw new NodeOperationError(this.getNode(), `Could not parse field '${field.id}' as JSON: ${val}`, { itemIndex: i });
 									}
 								}
 							}
 						}
 					}
 					const metaSelect = this.getNodeParameter('metaSelect', i) as string;
-					let meta: any = undefined;
+					let meta: IDataObject | undefined;
 					if (metaSelect === 'json') {
 						const metaJson = this.getNodeParameter('metaJson', i) as string;
 						if (metaJson) {
@@ -554,15 +554,15 @@ export class GotoHuman implements INodeType {
 						}
 					}
 					const assignToSelect = this.getNodeParameter('assignToSelect', i) as string;
-					let assignTo: any = undefined;
+					let assignTo: string[] | undefined;
 					if (assignToSelect === 'selectByEmail') {
 						const assignToParam = this.getNodeParameter('assignTo', i) as IDataObject;
 						if (assignToParam && Array.isArray(assignToParam.values)) {
-							assignTo = assignToParam.values.map((v: any) => v.email);
+							assignTo = (assignToParam.values as IDataObject[]).map((v) => v.email as string);
 						}
 					}
 					const additionalFields = this.getNodeParameter('additionalFields', i) as IDataObject;
-					const body: any = {
+					const body: IDataObject = {
 						formId: reviewTemplateID.value,
 						fields: parsedFields,
 						origin: 'n8n',
@@ -577,7 +577,7 @@ export class GotoHuman implements INodeType {
 						try {
 							body.workflow = jsonParse(additionalFields.workflow as string);
 						} catch {
-							throw new NodeOperationError(this.getNode(), 'workflow field is not valid JSON');
+							throw new NodeOperationError(this.getNode(), 'workflow field is not valid JSON', { itemIndex: i });
 						}
 					}
 					if (additionalFields?.updateForReviewId) {
@@ -593,24 +593,27 @@ export class GotoHuman implements INodeType {
 						url: `${BASE_URL}/requestReview`,
 						body,
 						json: true,
+						returnFullResponse: true,
+						ignoreHttpStatusErrors: true,
 					};
 					let responseData;
 					try {
-						responseData = await this.helpers.requestWithAuthentication.call(this, 'gotoHumanApi', options);
-						const statusCode = responseData?.statusCode || 200;
-						if (String(statusCode).startsWith('4') || String(statusCode).startsWith('5')) {
-							throw new NodeApiError(this.getNode(), responseData, {
-								message: responseData.body ? responseData.body : JSON.stringify(responseData),
-								httpCode: String(statusCode),
-							});
-						}
-						if (responseData && typeof responseData.timeoutInMillis === 'number' && responseData.timeoutInMillis > 0) {
-							waitMillis = responseData.timeoutInMillis;
-						}
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
 					} catch (error) {
-						throw error;
+						throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
 					}
-					returnData.push({ json: responseData });
+					const statusCode = responseData?.statusCode || 200;
+					if (String(statusCode).startsWith('4') || String(statusCode).startsWith('5')) {
+						throw new NodeApiError(this.getNode(), responseData, {
+							message: responseData.body ? responseData.body : JSON.stringify(responseData),
+							httpCode: String(statusCode),
+							itemIndex: i,
+						});
+					}
+					if (responseData?.body?.timeoutInMillis && typeof responseData.body.timeoutInMillis === 'number' && responseData.body.timeoutInMillis > 0) {
+						waitMillis = responseData.body.timeoutInMillis;
+					}
+					returnData.push({ json: responseData, pairedItem: { item: i } });
 			} else if (resource === 'reviewRequest' && operation === 'delete') {
 				const reviewId = this.getNodeParameter('reviewId', i) as string;
 				const options: IHttpRequestOptions = {
@@ -619,21 +622,28 @@ export class GotoHuman implements INodeType {
 					body: { reviewId },
 					json: true,
 				};
-				try {
-					const responseData = await this.helpers.requestWithAuthentication.call(this, 'gotoHumanApi', options);
-					returnData.push({ json: responseData ?? { success: true } });
-				} catch (error) {
-					throw error;
-				}
-			} else {
-				throw new NodeOperationError(this.getNode(), `The operation ${operation} is not supported!`);
+				const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
+				returnData.push({ json: responseData ?? { success: true }, pairedItem: { item: i } });
 			}
 			} catch (err) {
 				if (this.continueOnFail()) {
-					returnData.push({ json: { error: err.message }, error: err });
+					const errorMessage = err instanceof Error ? err.message : String(err);
+					returnData.push({
+						json: { error: errorMessage },
+						error: err,
+						pairedItem: { item: i },
+					});
 					continue;
 				}
-				throw err;
+				if (err instanceof NodeApiError) {
+					throw new NodeApiError(this.getNode(), { message: err.message } as JsonObject, {
+						message: err.message,
+						httpCode: err.httpCode ?? undefined,
+						itemIndex: i,
+					});
+				} else {
+					throw new NodeOperationError(this.getNode(), err.message || 'An unknown error occurred', { itemIndex: i });
+				}
 			}
 		}
 
@@ -644,6 +654,8 @@ export class GotoHuman implements INodeType {
 		}
 		return [returnData];
 	}
+
+	webhookMethods = gotoHumanWebhookMethods;
 
 	webhook = async function(this: IWebhookFunctions): Promise<IWebhookResponseData> {
 		const bodyData = this.getBodyData();

@@ -1,5 +1,6 @@
 import {
 	IAuthenticateGeneric,
+	Icon,
 	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
@@ -8,6 +9,7 @@ import {
 export class GotoHumanApi implements ICredentialType {
 	name = 'gotoHumanApi';
 	displayName = 'gotoHuman API';
+	icon: Icon = { light: 'file:../icons/gth.svg', dark: 'file:../icons/gth.dark.svg' };
 	documentationUrl = 'https://docs.gotohuman.com/Integrations/n8n';
 	properties: INodeProperties[] = [
 		{

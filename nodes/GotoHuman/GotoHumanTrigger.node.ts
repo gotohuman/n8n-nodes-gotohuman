@@ -1,5 +1,4 @@
 import {
-	IHookFunctions,
 	IWebhookFunctions,
 	ILoadOptionsFunctions,
 	INodeListSearchResult,
@@ -9,10 +8,9 @@ import {
 	IHttpRequestOptions,
 	NodeConnectionTypes,
 	NodeOperationError,
-	IDataObject,
 } from 'n8n-workflow';
 
-const BASE_URL = 'https://api.gotohuman.com';
+import { BASE_URL, gotoHumanWebhookMethods } from './helpers';
 
 export class GotoHumanTrigger implements INodeType {
 	description: INodeTypeDescription = {
@@ -21,10 +19,12 @@ export class GotoHumanTrigger implements INodeType {
 		icon: 'file:gotohuman.svg',
 		group: ['trigger'],
 		version: 1,
+		subtitle: '={{$parameter["reviewTemplateID"]}}',
 		description: 'Triggers when a gotoHuman review is completed or a trigger form is submitted',
 		defaults: {
 			name: 'gotoHuman Trigger',
 		},
+		usableAsTool: true,
 		inputs: [],
 		outputs: [NodeConnectionTypes.Main],
 		credentials: [
@@ -95,7 +95,7 @@ export class GotoHumanTrigger implements INodeType {
 				};
 
 				const reviewTemplates: ReviewTemplatesResponse =
-					await this.helpers.requestWithAuthentication.call(this, 'gotoHumanApi', options);
+					await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
 
 				if (reviewTemplates === undefined) {
 					throw new NodeOperationError(
@@ -119,77 +119,7 @@ export class GotoHumanTrigger implements INodeType {
 		},
 	};
 
-	webhookMethods = {
-		default: {
-			async checkExists(this: IHookFunctions): Promise<boolean> {
-				const webhookUrl = this.getNodeWebhookUrl('default') as string;
-				const reviewTemplateObj = this.getNodeParameter('reviewTemplateID') as IDataObject;
-				const formId = reviewTemplateObj.value as string;
-
-				const options: IHttpRequestOptions = {
-					method: 'POST',
-					url: `${BASE_URL}/checkWebhook`,
-					body: { formId, webhookUrl },
-					json: true,
-				};
-
-				const response = await this.helpers.requestWithAuthentication.call(
-					this,
-					'gotoHumanApi',
-					options,
-				);
-				return response.exists === true;
-			},
-
-			async create(this: IHookFunctions): Promise<boolean> {
-				const webhookUrl = this.getNodeWebhookUrl('default') as string;
-				const reviewTemplateObj = this.getNodeParameter('reviewTemplateID') as IDataObject;
-				const formId = reviewTemplateObj.value as string;
-
-				const options: IHttpRequestOptions = {
-					method: 'POST',
-					url: `${BASE_URL}/createWebhook`,
-					body: { formId, webhookUrl },
-					json: true,
-				};
-
-				const response = await this.helpers.requestWithAuthentication.call(
-					this,
-					'gotoHumanApi',
-					options,
-				);
-
-				if (response.success) {
-					const webhookData = this.getWorkflowStaticData('node');
-					webhookData.webhookId = response.webhookId as string;
-					return true;
-				}
-				return false;
-			},
-
-			async delete(this: IHookFunctions): Promise<boolean> {
-				const webhookUrl = this.getNodeWebhookUrl('default') as string;
-				const reviewTemplateObj = this.getNodeParameter('reviewTemplateID') as IDataObject;
-				const formId = reviewTemplateObj.value as string;
-
-				const options: IHttpRequestOptions = {
-					method: 'POST',
-					url: `${BASE_URL}/deleteWebhook`,
-					body: { formId, webhookUrl },
-					json: true,
-				};
-
-				try {
-					await this.helpers.requestWithAuthentication.call(this, 'gotoHumanApi', options);
-					const webhookData = this.getWorkflowStaticData('node');
-					delete webhookData.webhookId;
-				} catch {
-					return false;
-				}
-				return true;
-			},
-		},
-	};
+	webhookMethods = gotoHumanWebhookMethods;
 
 	async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
 		const bodyData = this.getBodyData();
