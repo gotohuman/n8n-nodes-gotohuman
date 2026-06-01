@@ -8,6 +8,49 @@ import {
 
 export const BASE_URL = 'https://api.gotohuman.com';
 
+async function gotoHumanHookRequest(
+	hook: IHookFunctions,
+	options: IHttpRequestOptions,
+): Promise<IDataObject> {
+	const requestOptions: IHttpRequestOptions = {
+		...options,
+		returnFullResponse: true,
+		ignoreHttpStatusErrors: true,
+	};
+
+	let responseData: IDataObject;
+	try {
+		responseData = await hook.helpers.httpRequestWithAuthentication.call(
+			hook,
+			'gotoHumanApi',
+			requestOptions,
+		);
+	} catch (error) {
+		throw new NodeApiError(hook.getNode(), error as JsonObject);
+	}
+
+	const statusCode = responseData?.statusCode || 200;
+	if (String(statusCode).startsWith('4') || String(statusCode).startsWith('5')) {
+		const body = responseData.body as IDataObject | string | undefined;
+		let message: string;
+		if (typeof body === 'object' && body !== null && typeof body.error === 'string') {
+			message = body.error;
+		} else if (typeof body === 'string') {
+			message = body;
+		} else if (body !== undefined) {
+			message = JSON.stringify(body);
+		} else {
+			message = JSON.stringify(responseData);
+		}
+		throw new NodeApiError(hook.getNode(), responseData as JsonObject, {
+			message,
+			httpCode: String(statusCode),
+		});
+	}
+
+	return (responseData.body ?? responseData) as IDataObject;
+}
+
 export const gotoHumanWebhookMethods = {
 	default: {
 		async checkExists(this: IHookFunctions): Promise<boolean> {
@@ -15,18 +58,12 @@ export const gotoHumanWebhookMethods = {
 			const reviewTemplateObj = this.getNodeParameter('reviewTemplateID') as IDataObject;
 			const formId = reviewTemplateObj.value as string;
 
-			const options: IHttpRequestOptions = {
+			const response = await gotoHumanHookRequest(this, {
 				method: 'POST',
 				url: `${BASE_URL}/checkWebhook`,
 				body: { formId, webhookUrl },
 				json: true,
-			};
-
-			const response = await this.helpers.httpRequestWithAuthentication.call(
-				this,
-				'gotoHumanApi',
-				options,
-			);
+			});
 			return response.exists === true;
 		},
 
@@ -35,18 +72,12 @@ export const gotoHumanWebhookMethods = {
 			const reviewTemplateObj = this.getNodeParameter('reviewTemplateID') as IDataObject;
 			const formId = reviewTemplateObj.value as string;
 
-			const options: IHttpRequestOptions = {
+			const response = await gotoHumanHookRequest(this, {
 				method: 'POST',
 				url: `${BASE_URL}/createWebhook`,
 				body: { formId, webhookUrl },
 				json: true,
-			};
-
-			const response = await this.helpers.httpRequestWithAuthentication.call(
-				this,
-				'gotoHumanApi',
-				options,
-			);
+			});
 
 			if (response.success) {
 				const webhookData = this.getWorkflowStaticData('node');
@@ -61,21 +92,16 @@ export const gotoHumanWebhookMethods = {
 			const reviewTemplateObj = this.getNodeParameter('reviewTemplateID') as IDataObject;
 			const formId = reviewTemplateObj.value as string;
 
-			const options: IHttpRequestOptions = {
+			await gotoHumanHookRequest(this, {
 				method: 'POST',
 				url: `${BASE_URL}/deleteWebhook`,
 				body: { formId, webhookUrl },
 				json: true,
-			};
+			});
 
-			try {
-				await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
-				const webhookData = this.getWorkflowStaticData('node');
-				delete webhookData.webhookId;
-				return true;
-			} catch (error) {
-				throw new NodeApiError(this.getNode(), error as JsonObject);
-			}
+			const webhookData = this.getWorkflowStaticData('node');
+			delete webhookData.webhookId;
+			return true;
 		},
 	},
 };

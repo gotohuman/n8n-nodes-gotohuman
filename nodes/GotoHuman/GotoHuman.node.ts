@@ -88,6 +88,43 @@ export class GotoHuman implements INodeType {
 				},
 			},
 			{
+				displayName: 'Agent',
+				name: 'agentID',
+				type: 'resourceLocator',
+				description: 'Choose an agent from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+				default: { mode: 'list', value: '' },
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						placeholder: 'Select the agent you are requesting as...',
+						typeOptions: {
+							searchListMethod: 'searchAgents',
+							searchable: true,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						hint: 'Enter an ID',
+						placeholder: 'e.g. Y5XrpfmvpKcdJzKYLX2M',
+					}
+				],
+				displayOptions: {
+					show: {
+						resource: [
+							'reviewRequest',
+						],
+					operation: [
+						'send',
+						'sendAndWait',
+					],
+					},
+				},
+			},
+			{
 				displayName: 'Review Template',
 				name: 'reviewTemplateID',
 				type: 'resourceLocator',
@@ -402,6 +439,43 @@ export class GotoHuman implements INodeType {
 
 	methods = {
 		listSearch: {
+			async searchAgents(
+				this: ILoadOptionsFunctions,
+				filter?: string,
+			): Promise<INodeListSearchResult> {
+
+				interface Agent {
+					value: string;
+					label: string;
+				}
+
+				interface AgentsResponse {
+					agents: Agent[];
+				}
+
+				const options: IHttpRequestOptions = {
+					method: 'GET',
+					url: `${BASE_URL}/fetchN8nAgents`,
+					json: true,
+				};
+
+				const agentsResponse: AgentsResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
+
+				if (agentsResponse === undefined) {
+					throw new NodeOperationError(this.getNode(), 'No agents found. Please create one first in our web app.');
+				}
+
+				return {
+					results: (agentsResponse?.agents || [])
+						.filter(
+							(agent) => !filter || agent.label.toLowerCase().includes(filter.toLowerCase()),
+						)
+						.map((agent) => ({
+							name: agent.label,
+							value: agent.value,
+						})),
+				};
+			},
 			async searchReviewTemplates(
 				this: ILoadOptionsFunctions,
 				filter?: string,
@@ -488,6 +562,7 @@ export class GotoHuman implements INodeType {
 		for (let i = 0; i < items.length; i++) {
 			try {
 				if (resource === 'reviewRequest' && (operation === 'sendAndWait' || operation === 'send')) {
+					const agentID = this.getNodeParameter('agentID', i) as IDataObject;
 					const reviewTemplateID = this.getNodeParameter('reviewTemplateID', i) as IDataObject;
 					const useSendRawReviewData = this.isNodeFeatureEnabled('sendRawReviewData');
 					let parsedFields: IDataObject;
@@ -569,6 +644,7 @@ export class GotoHuman implements INodeType {
 						originV: this.getNode().typeVersion,
 					};
 					if (parsedConfig !== undefined) body.config = parsedConfig;
+					if (agentID?.value) body.agentId = agentID.value;
 					if (meta !== undefined) body.meta = meta;
 					if (assignTo !== undefined) body.assignTo = assignTo;
 					if (additionalFields?.title) body.title = additionalFields.title;
