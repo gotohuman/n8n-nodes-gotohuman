@@ -49,6 +49,11 @@ export class GotoHuman implements INodeType {
 						value: 'reviewRequest',
 						description: 'Request for Human Review',
 					},
+					{
+						name: 'Message',
+						value: 'message',
+						description: 'Send a message to a human',
+					},
 				],
 				default: 'reviewRequest',
 				required: true,
@@ -87,47 +92,128 @@ export class GotoHuman implements INodeType {
 					},
 				},
 			},
-			{
-				displayName: 'Agent',
-				name: 'agentID',
-				type: 'resourceLocator',
-				description: 'Choose an agent from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-				default: { mode: 'list', value: '' },
-				modes: [
-					{
-						displayName: 'From List',
-						name: 'list',
-						type: 'list',
-						placeholder: 'Select the agent you are requesting as...',
-						typeOptions: {
-							searchListMethod: 'searchAgents',
-							searchable: true,
-						},
-					},
-					{
-						displayName: 'ID',
-						name: 'id',
-						type: 'string',
-						hint: 'Enter an ID',
-						placeholder: 'e.g. Y5XrpfmvpKcdJzKYLX2M',
-					}
-				],
-				displayOptions: {
-					show: {
-						resource: [
-							'reviewRequest',
-						],
-					operation: [
-						'send',
-						'sendAndWait',
-					],
-					},
+		{
+			displayName: 'Operation',
+			name: 'operation',
+			type: 'options',
+			noDataExpression: true,
+			options: [
+				{
+					name: 'Send Message to Human',
+					value: 'sendMessage',
+					action: 'Send message to human',
+					description: 'Send a message to a human',
+				},
+			],
+			default: 'sendMessage',
+			displayOptions: {
+				show: {
+					resource: ['message'],
 				},
 			},
+		},
+		{
+			displayName: 'Agent',
+			name: 'agentID',
+			type: 'resourceLocator',
+			description: 'Choose the agent you are acting as from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+			default: { mode: 'list', value: '' },
+			modes: [
+				{
+					displayName: 'From List',
+					name: 'list',
+					type: 'list',
+					placeholder: 'Select the agent you are requesting as...',
+					typeOptions: {
+						searchListMethod: 'searchAgents',
+						searchable: true,
+					},
+				},
+				{
+					displayName: 'ID',
+					name: 'id',
+					type: 'string',
+					hint: 'Enter an ID',
+					placeholder: 'e.g. Y5XrpfmvpKcdJzKYLX2M',
+				}
+			],
+			displayOptions: {
+				show: {
+					resource: [
+						'reviewRequest',
+					],
+				operation: [
+					'send',
+					'sendAndWait',
+				],
+				},
+			},
+		},
+		{
+			displayName: 'Agent',
+			name: 'agentID',
+			type: 'resourceLocator',
+			required: true,
+			description: 'Choose the agent you are messaging as from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+			default: { mode: 'list', value: '' },
+			modes: [
+				{
+					displayName: 'From List',
+					name: 'list',
+					type: 'list',
+					placeholder: 'Select the agent you are messaging as...',
+					typeOptions: {
+						searchListMethod: 'searchAgents',
+						searchable: true,
+					},
+				},
+				{
+					displayName: 'ID',
+					name: 'id',
+					type: 'string',
+					hint: 'Enter an ID',
+					placeholder: 'e.g. Y5XrpfmvpKcdJzKYLX2M',
+				}
+			],
+			displayOptions: {
+				show: {
+					resource: ['message'],
+					operation: ['sendMessage'],
+				},
+			},
+		},
+		{
+			displayName: 'Session ID',
+			name: 'sessionId',
+			type: 'string',
+			default: '',
+			description: 'The session ID to associate the message with',
+			displayOptions: {
+				show: {
+					resource: ['message'],
+					operation: ['sendMessage'],
+				},
+			},
+		},
+		{
+			displayName: 'Message',
+			name: 'message',
+			type: 'string',
+			required: true,
+			default: '',
+			description: 'The message to send to the human',
+			displayOptions: {
+				show: {
+					resource: ['message'],
+					operation: ['sendMessage'],
+				},
+			},
+		},
 			{
 				displayName: 'Review Template',
 				name: 'reviewTemplateID',
 				type: 'resourceLocator',
+				required: true,
 				description: 'Choose a review template from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
 				default: { mode: 'list', value: '' },
 				modes: [
@@ -227,6 +313,19 @@ export class GotoHuman implements INodeType {
 			},
 		},
 		{
+			displayName: 'Session ID',
+			name: 'sessionId',
+			type: 'string',
+			default: '',
+			description: 'Send to connect various events and reviews of the same agent session/execution',
+			displayOptions: {
+				show: {
+					resource: ['reviewRequest'],
+					operation: ['send', 'sendAndWait'],
+				},
+			},
+		},
+		{
 			displayName: 'Meta Data',
 			name: 'metaSelect',
 				description: 'Select if you want to add meta data that you want to receive back in the response webhook',
@@ -315,12 +414,12 @@ export class GotoHuman implements INodeType {
 			{
 				displayName: 'Assigned Users',
 				name: 'assignToSelect',
-				description: 'Select who you want to assign the review to',
+				description: 'Change if you want to assign the review to a specific user',
 				required: true,
 				type: 'options',
 				options: [
 					{
-						name: 'All Users in Your Account',
+						name: 'Default / All',
 						value: 'all',
 					},
 					{
@@ -418,7 +517,7 @@ export class GotoHuman implements INodeType {
 						description: 'Whether to automatically approve this request. Read more about it <a href="https://docs.gotohuman.com/send-requests">here</a>.',
 					},
 					{
-						displayName: 'Workflow Info',
+						displayName: 'Workflow Info (Legacy)',
 						name: 'workflow',
 						type: 'json',
 						default: '',
@@ -426,7 +525,7 @@ export class GotoHuman implements INodeType {
 						description: 'Send to connect multiple review steps. Read more about it <a href="https://docs.gotohuman.com/send-requests#workflow-metadata">here</a>.',
 					},
 					{
-						displayName: 'Update for Review ID',
+						displayName: 'Update for Review ID (Legacy)',
 						name: 'updateForReviewId',
 						type: 'string',
 						default: '',
@@ -659,6 +758,8 @@ export class GotoHuman implements INodeType {
 					if (additionalFields?.updateForReviewId) {
 						body.updateForReviewId = additionalFields.updateForReviewId;
 					}
+				const sessionId = this.getNodeParameter('sessionId', i) as string;
+				if (sessionId) body.sessionId = sessionId;
 				if (operation === 'sendAndWait') {
 					const resumeUrl = this.evaluateExpression('{{ $execution?.resumeUrl }}', i) as string;
 					const nodeId = this.evaluateExpression('{{ $nodeId }}', i) as string;
@@ -700,6 +801,40 @@ export class GotoHuman implements INodeType {
 				};
 				const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
 				returnData.push({ json: responseData ?? { success: true }, pairedItem: { item: i } });
+			} else if (resource === 'message' && operation === 'sendMessage') {
+				const agentID = this.getNodeParameter('agentID', i) as IDataObject;
+				const sessionId = this.getNodeParameter('sessionId', i) as string;
+				const message = this.getNodeParameter('message', i) as string;
+				const body: IDataObject = {
+					sessionId,
+					message,
+					origin: 'n8n',
+					originV: this.getNode().typeVersion,
+				};
+				if (agentID?.value) body.agentId = agentID.value;
+				const options: IHttpRequestOptions = {
+					method: 'POST',
+					url: `${BASE_URL}/sendMessageToHuman`,
+					body,
+					json: true,
+					returnFullResponse: true,
+					ignoreHttpStatusErrors: true,
+				};
+				let responseData;
+				try {
+					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
+				} catch (error) {
+					throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
+				}
+				const statusCode = responseData?.statusCode || 200;
+				if (String(statusCode).startsWith('4') || String(statusCode).startsWith('5')) {
+					throw new NodeApiError(this.getNode(), responseData, {
+						message: responseData.body ? responseData.body : JSON.stringify(responseData),
+						httpCode: String(statusCode),
+						itemIndex: i,
+					});
+				}
+				returnData.push({ json: responseData, pairedItem: { item: i } });
 			}
 			} catch (err) {
 				if (this.continueOnFail()) {

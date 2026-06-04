@@ -2,7 +2,7 @@
 	"node": "n8n-nodes-base.gotohuman",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
-	"categories": ["Communication", "HITL"],
+	"categories": ["Communication", "Marketing & Content", "Productivity", "Utility"],
 	"resources": {
 		"credentialDocumentation": [
 			{
