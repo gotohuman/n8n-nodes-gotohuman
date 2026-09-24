@@ -22,7 +22,7 @@ export class GotoHumanTrigger implements INodeType {
 		group: ['trigger'],
 		version: 1,
 		subtitle:
-			'={{$parameter["triggerOn"] === "onTriggerFormSubmission" ? "Trigger form: " + $parameter["triggerFormID"] : $parameter["triggerOn"] === "onAgentMessageOrToolResult" ? "Agent: " + $parameter["agentID"] : "Review template: " + $parameter["reviewTemplateID"]}}',
+			'={{$parameter["triggerOn"] === "onTriggerFormSubmission" ? "Trigger form: " + $parameter["triggerFormID"] : $parameter["triggerOn"] === "onAgentMessageOrToolResult" ? "Agent: " + $parameter["agentID"] : "Review type: " + $parameter["reviewTemplateID"]}}',
 		description: 'Triggers when a gotoHuman event occurs',
 		defaults: {
 			name: 'gotoHuman Trigger',
@@ -54,25 +54,26 @@ export class GotoHumanTrigger implements INodeType {
 				default: 'onReviewCompletion',
 				options: [
 					{
-						name: 'Completed Review',
+						name: 'Completed Review of a Type',
 						value: 'onReviewCompletion',
 					},
 					{
-						name: 'Message or Tool Result for Agent',
+						name: 'Completed Review for an Agent',
+						// legacy value name to avoid breaking changes
 						value: 'onAgentMessageOrToolResult',
 					},
 					{
-						name: 'Submitted Agent Trigger Form',
+						name: 'Submitted Trigger Form',
 						value: 'onTriggerFormSubmission',
 					},
 				],
 			},
 			{
-				displayName: 'Review Template',
+				displayName: 'Review Type',
 				name: 'reviewTemplateID',
 				type: 'resourceLocator',
 				description:
-					'Choose a review template from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+					'Choose a review type from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
 				default: { mode: 'list', value: '' },
 				required: true,
 				modes: [
@@ -80,7 +81,7 @@ export class GotoHumanTrigger implements INodeType {
 						displayName: 'From List',
 						name: 'list',
 						type: 'list',
-						placeholder: 'Select a review template...',
+						placeholder: 'Select a review type...',
 						typeOptions: {
 							searchListMethod: 'searchReviewTemplates',
 							searchable: true,

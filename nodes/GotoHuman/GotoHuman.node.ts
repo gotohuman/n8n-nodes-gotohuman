@@ -49,11 +49,6 @@ export class GotoHuman implements INodeType {
 						value: 'reviewRequest',
 						description: 'Request for Human Review',
 					},
-					{
-						name: 'Message',
-						value: 'message',
-						description: 'Send a message to a human',
-					},
 				],
 				default: 'reviewRequest',
 				required: true,
@@ -93,26 +88,6 @@ export class GotoHuman implements INodeType {
 				},
 			},
 		{
-			displayName: 'Operation',
-			name: 'operation',
-			type: 'options',
-			noDataExpression: true,
-			options: [
-				{
-					name: 'Send Message to Human',
-					value: 'sendMessage',
-					action: 'Send message to human',
-					description: 'Send a message to a human',
-				},
-			],
-			default: 'sendMessage',
-			displayOptions: {
-				show: {
-					resource: ['message'],
-				},
-			},
-		},
-		{
 			displayName: 'Agent',
 			name: 'agentID',
 			type: 'resourceLocator',
@@ -149,79 +124,19 @@ export class GotoHuman implements INodeType {
 				},
 			},
 		},
-		{
-			displayName: 'Agent',
-			name: 'agentID',
-			type: 'resourceLocator',
-			required: true,
-			description: 'Choose the agent you are messaging as from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-			default: { mode: 'list', value: '' },
-			modes: [
-				{
-					displayName: 'From List',
-					name: 'list',
-					type: 'list',
-					placeholder: 'Select the agent you are messaging as...',
-					typeOptions: {
-						searchListMethod: 'searchAgents',
-						searchable: true,
-					},
-				},
-				{
-					displayName: 'ID',
-					name: 'id',
-					type: 'string',
-					hint: 'Enter an ID',
-					placeholder: 'e.g. Y5XrpfmvpKcdJzKYLX2M',
-				}
-			],
-			displayOptions: {
-				show: {
-					resource: ['message'],
-					operation: ['sendMessage'],
-				},
-			},
-		},
-		{
-			displayName: 'Session ID',
-			name: 'sessionId',
-			type: 'string',
-			default: '',
-			description: 'The session ID to associate the message with',
-			displayOptions: {
-				show: {
-					resource: ['message'],
-					operation: ['sendMessage'],
-				},
-			},
-		},
-		{
-			displayName: 'Message',
-			name: 'message',
-			type: 'string',
-			required: true,
-			default: '',
-			description: 'The message to send to the human',
-			displayOptions: {
-				show: {
-					resource: ['message'],
-					operation: ['sendMessage'],
-				},
-			},
-		},
 			{
-				displayName: 'Review Template',
+				displayName: 'Review Type',
 				name: 'reviewTemplateID',
 				type: 'resourceLocator',
 				required: true,
-				description: 'Choose a review template from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+				description: 'Choose a review type from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
 				default: { mode: 'list', value: '' },
 				modes: [
 					{
 						displayName: 'From List',
 						name: 'list',
 						type: 'list',
-						placeholder: 'Select a Review Template...',
+						placeholder: 'Select a Review Type...',
 						typeOptions: {
 							searchListMethod: 'searchReviewTemplates',
 							searchable: true,
@@ -286,7 +201,7 @@ export class GotoHuman implements INodeType {
 			required: true,
 			default: '',
 			placeholder: 'e.g. {"property1": "value1"}',
-			description: 'The data to populate the review template',
+			description: 'The data to populate the review',
 			displayOptions: {
 				show: {
 					resource: ['reviewRequest'],
@@ -598,7 +513,7 @@ export class GotoHuman implements INodeType {
 				const reviewTemplates: ReviewTemplatesResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
 
 				if (reviewTemplates === undefined) {
-					throw new NodeOperationError(this.getNode(), 'No review templates found. Please create one first in our web app.');
+					throw new NodeOperationError(this.getNode(), 'No review types found. Please create one first in our web app.');
 				}
 
 				return {
@@ -640,7 +555,7 @@ export class GotoHuman implements INodeType {
 				const templateFieldsResponse: ReviewTemplateFieldsResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
 
 				if (templateFieldsResponse?.fields === undefined) {
-					throw new NodeOperationError(this.getNode(), 'No fields found for review template. Please add some fields in our web editor first.');
+					throw new NodeOperationError(this.getNode(), 'No fields found for review type. Please add some fields in our web editor first.');
 				}
 				const fieldSpecs = templateFieldsResponse.fields;
 
@@ -801,40 +716,6 @@ export class GotoHuman implements INodeType {
 				};
 				const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
 				returnData.push({ json: responseData ?? { success: true }, pairedItem: { item: i } });
-			} else if (resource === 'message' && operation === 'sendMessage') {
-				const agentID = this.getNodeParameter('agentID', i) as IDataObject;
-				const sessionId = this.getNodeParameter('sessionId', i) as string;
-				const message = this.getNodeParameter('message', i) as string;
-				const body: IDataObject = {
-					sessionId,
-					message,
-					origin: 'n8n',
-					originV: this.getNode().typeVersion,
-				};
-				if (agentID?.value) body.agentId = agentID.value;
-				const options: IHttpRequestOptions = {
-					method: 'POST',
-					url: `${BASE_URL}/sendMessageToHuman`,
-					body,
-					json: true,
-					returnFullResponse: true,
-					ignoreHttpStatusErrors: true,
-				};
-				let responseData;
-				try {
-					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
-				} catch (error) {
-					throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
-				}
-				const statusCode = responseData?.statusCode || 200;
-				if (String(statusCode).startsWith('4') || String(statusCode).startsWith('5')) {
-					throw new NodeApiError(this.getNode(), responseData, {
-						message: responseData.body ? responseData.body : JSON.stringify(responseData),
-						httpCode: String(statusCode),
-						itemIndex: i,
-					});
-				}
-				returnData.push({ json: responseData, pairedItem: { item: i } });
 			}
 			} catch (err) {
 				if (this.continueOnFail()) {

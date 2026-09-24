@@ -59,6 +59,7 @@ export function getTriggerOn(hook: IHookFunctions): string {
 }
 
 export function isAgentWebhookTrigger(hook: IHookFunctions): boolean {
+	// Value kept as onAgentMessageOrToolResult because it is stored in existing workflows.
 	return getTriggerOn(hook) === 'onAgentMessageOrToolResult';
 }
 
@@ -105,7 +106,7 @@ export async function fetchN8nFormsListSearch(
 	if (response === undefined) {
 		const emptyLabel = query?.onlyTriggerForms
 			? 'No trigger forms found. Please create one first in our web app.'
-			: 'No review templates found. Please create one first in our web app.';
+			: 'No review types found. Please create one first in our web app.';
 		throw new NodeOperationError(this.getNode(), emptyLabel);
 	}
 
