@@ -91,7 +91,7 @@ export class GotoHuman implements INodeType {
 			displayName: 'Agent',
 			name: 'agentID',
 			type: 'resourceLocator',
-			description: 'Choose the agent you are acting as from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+			description: 'Choose the agent you are acting as from the list. Read the <a href="https://docs.gotohuman.com/agent-setup">docs</a>.',
 			default: { mode: 'list', value: '' },
 			modes: [
 				{
@@ -129,7 +129,7 @@ export class GotoHuman implements INodeType {
 				name: 'reviewTemplateID',
 				type: 'resourceLocator',
 				required: true,
-				description: 'Choose a review type from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+				description: 'Choose a review type from the list. Read the <a href="https://docs.gotohuman.com/create-template">docs</a>.',
 				default: { mode: 'list', value: '' },
 				modes: [
 					{
@@ -201,7 +201,7 @@ export class GotoHuman implements INodeType {
 			required: true,
 			default: '',
 			placeholder: 'e.g. {"property1": "value1"}',
-			description: 'The data to populate the review',
+			description: 'The data to populate the review. Read the <a href="https://docs.gotohuman.com/api-reference/request-review#param-data">docs</a>.',
 			displayOptions: {
 				show: {
 					resource: ['reviewRequest'],
@@ -217,7 +217,7 @@ export class GotoHuman implements INodeType {
 			type: 'json',
 			default: '{}',
 			placeholder: 'e.g. {"fields": { "myField1": { ... } }}',
-			description: "Can optionally be used to dynamically configure your review and its fields",
+			description: 'Can optionally be used to dynamically configure your review and its fields. Read the <a href="https://docs.gotohuman.com/api-reference/request-review#param-config">docs</a>.',
 			displayOptions: {
 				show: {
 					resource: ['reviewRequest'],
@@ -232,7 +232,8 @@ export class GotoHuman implements INodeType {
 			name: 'sessionId',
 			type: 'string',
 			default: '',
-			description: 'Send to connect various events and reviews of the same agent session/execution',
+			// eslint-disable-next-line n8n-nodes-base/node-param-description-miscased-id
+			description: 'Send to connect various events and reviews of the same session/run. Read the <a href="https://docs.gotohuman.com/api-reference/request-review#param-session-id">docs</a>.',
 			displayOptions: {
 				show: {
 					resource: ['reviewRequest'],
@@ -329,7 +330,7 @@ export class GotoHuman implements INodeType {
 			{
 				displayName: 'Assigned Users',
 				name: 'assignToSelect',
-				description: 'Change if you want to assign the review to a specific user',
+				description: 'Change if you want to assign the review to a specific user. Read the <a href="https://docs.gotohuman.com/api-reference/request-review#param-assign-to">docs</a>.',
 				required: true,
 				type: 'options',
 				options: [
@@ -422,14 +423,14 @@ export class GotoHuman implements INodeType {
 						name: 'title',
 						type: 'string',
 						default: '',
-						description: 'Set a title for this review request. Read more about it <a href="https://docs.gotohuman.com/send-requests">here</a>.',
+						description: 'Set a title for this review request. Read the <a href="https://docs.gotohuman.com/api-reference/request-review#param-title">docs</a>.',
 					},
 					{
 						displayName: 'Auto Approve',
 						name: 'autoApprove',
 						type: 'boolean',
 						default: false,
-						description: 'Whether to automatically approve this request. Read more about it <a href="https://docs.gotohuman.com/send-requests">here</a>.',
+						description: 'Whether to automatically approve this request. Read the <a href="https://docs.gotohuman.com/api-reference/request-review#param-auto-approve">docs</a>.',
 					},
 					{
 						displayName: 'Workflow Info (Legacy)',
@@ -437,14 +438,14 @@ export class GotoHuman implements INodeType {
 						type: 'json',
 						default: '',
 						placeholder: '{"runId": "123456", "runName": "My Workflow", "prevSteps": ["1234567890"]}',
-						description: 'Send to connect multiple review steps. Read more about it <a href="https://docs.gotohuman.com/send-requests#workflow-metadata">here</a>.',
+						description: 'Deprecated. Send to connect multiple review steps.',
 					},
 					{
 						displayName: 'Update for Review ID (Legacy)',
 						name: 'updateForReviewId',
 						type: 'string',
 						default: '',
-						description: 'To update a specific review, enter the review ID here. Read more about it <a href="https://docs.gotohuman.com/retries">here</a>.',
+						description: 'Deprecated. To update a specific review, enter the review ID here.',
 					},
 				],
 			}

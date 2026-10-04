@@ -1,5 +1,5 @@
 {
-	"node": "n8n-nodes-base.gotoHumanTrigger",
+	"node": "@gotohuman/n8n-nodes-gotohuman.gotoHumanTrigger",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["Communication", "Marketing & Content", "Productivity", "Utility"],

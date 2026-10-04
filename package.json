@@ -1,6 +1,6 @@
 {
   "name": "@gotohuman/n8n-nodes-gotohuman",
-  "version": "0.4.0",
+  "version": "1.4.1",
   "description": "n8n node to request human reviews in AI workflows with gotoHuman",
   "keywords": [
     "n8n-community-node-package",
@@ -45,7 +45,8 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/GotoHumanApi.credentials.js"
+      "dist/credentials/GotoHumanApi.credentials.js",
+      "dist/credentials/GotoHumanWebhookSigningSecretApi.credentials.js"
     ],
     "nodes": [
       "dist/nodes/GotoHuman/GotoHuman.node.js",
