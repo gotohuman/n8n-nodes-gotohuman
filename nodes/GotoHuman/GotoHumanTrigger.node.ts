@@ -22,7 +22,7 @@ export class GotoHumanTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'gotoHuman Trigger',
 		name: 'gotoHumanTrigger',
-		icon: 'file:gotohuman.svg',
+		icon: { light: 'file:../../icons/gth.svg', dark: 'file:../../icons/gth.dark.svg' },
 		group: ['trigger'],
 		version: 1,
 		subtitle:

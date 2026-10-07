@@ -6,7 +6,7 @@ export class GotoHuman implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'gotoHuman',
 		name: 'gotoHuman',
-		icon: 'file:gotohuman.svg',
+		icon: { light: 'file:../../icons/gth.svg', dark: 'file:../../icons/gth.dark.svg' },
 		group: ['transform'],
 		version: [1, 2],
 		features: {
