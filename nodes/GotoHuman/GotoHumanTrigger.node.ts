@@ -9,14 +9,87 @@ import {
 	INodeTypeDescription,
 	IWebhookResponseData,
 	NodeConnectionTypes,
+	NodeOperationError,
 } from 'n8n-workflow';
 
 import {
+	ANY_REVIEW_FOR_AGENT,
+	ANY_REVIEW_FOR_AGENT_LABEL,
+	REVIEW_CONFIG_WEBHOOKS_FEATURE,
 	fetchN8nAgentsListSearch,
 	fetchN8nFormsListSearch,
 	gotoHumanWebhookMethods,
+	locatorValue,
 } from './helpers';
 import { getSigningSecretFormatError, verifyWebhookSignature } from './webhook-helpers';
+
+const featureOff = { '@feature': [{ _cnd: { not: REVIEW_CONFIG_WEBHOOKS_FEATURE } }] };
+
+const agentModes = [
+	{
+		displayName: 'From List',
+		name: 'list',
+		type: 'list' as const,
+		placeholder: 'Select an agent...',
+		typeOptions: {
+			searchListMethod: 'searchAgents',
+			searchable: true,
+		},
+	},
+	{
+		displayName: 'ID',
+		name: 'id',
+		type: 'string' as const,
+		hint: 'Enter an ID',
+		placeholder: 'e.g. Y5XrpfmvpKcdJzKYLX2M',
+	},
+];
+
+const reviewTypeModes = [
+	{
+		displayName: 'From List',
+		name: 'list',
+		type: 'list' as const,
+		placeholder: 'Select a review type...',
+		typeOptions: {
+			searchListMethod: 'searchReviewTemplates',
+			searchable: true,
+		},
+	},
+	{
+		displayName: 'ID',
+		name: 'id',
+		type: 'string' as const,
+		hint: 'Enter an ID',
+		placeholder: 'e.g. FjbxGtNfPIuDdRm55eqK',
+	},
+];
+
+const triggerFormModes = [
+	{
+		displayName: 'From List',
+		name: 'list',
+		type: 'list' as const,
+		placeholder: 'Select a trigger form...',
+		typeOptions: {
+			searchListMethod: 'searchTriggerForms',
+			searchable: true,
+		},
+	},
+	{
+		displayName: 'ID',
+		name: 'id',
+		type: 'string' as const,
+		hint: 'Enter an ID',
+		placeholder: 'e.g. FjbxGtNfPIuDdRm55eqK',
+	},
+];
+
+function withAnyReview(
+	results: INodeListSearchResult['results'],
+): INodeListSearchResult['results'] {
+	return [{ name: ANY_REVIEW_FOR_AGENT_LABEL, value: ANY_REVIEW_FOR_AGENT }, ...results];
+}
 
 export class GotoHumanTrigger implements INodeType {
 	description: INodeTypeDescription = {
@@ -24,9 +97,11 @@ export class GotoHumanTrigger implements INodeType {
 		name: 'gotoHumanTrigger',
 		icon: { light: 'file:../../icons/gth.svg', dark: 'file:../../icons/gth.dark.svg' },
 		group: ['trigger'],
-		version: 1,
-		subtitle:
-			'={{$parameter["triggerOn"] === "onTriggerFormSubmission" ? "Trigger form: " + $parameter["triggerFormID"] : $parameter["triggerOn"] === "onAgentMessageOrToolResult" ? "Agent: " + $parameter["agentID"] : "Review type: " + $parameter["reviewTemplateID"]}}',
+		version: [1, 2],
+		features: {
+			[REVIEW_CONFIG_WEBHOOKS_FEATURE]: { '@version': [{ _cnd: { gte: 2 } }] },
+		},
+		subtitle: `={{$parameter["triggerOn"] === "onTriggerFormSubmission" ? "Trigger form: " + $parameter["triggerFormID"] : $parameter["triggerOn"] === "onAgentMessageOrToolResult" && $parameter["reviewTemplateID"] && $parameter["reviewTemplateID"] !== "${ANY_REVIEW_FOR_AGENT}" ? "Review: " + $parameter["reviewTemplateID"] : $parameter["triggerOn"] === "onAgentMessageOrToolResult" ? "Agent: " + $parameter["agentID"] : "Review type: " + $parameter["reviewTemplateID"]}}`,
 		description: 'Triggers when a gotoHuman event occurs',
 		defaults: {
 			name: 'gotoHuman Trigger',
@@ -74,16 +149,20 @@ export class GotoHumanTrigger implements INodeType {
 				name: 'triggerOn',
 				type: 'options',
 				required: true,
-				default: 'onReviewCompletion',
+				// Saved workflows keep their stored value. New nodes start on Completed Review.
+				default: 'onAgentMessageOrToolResult',
 				options: [
 					{
-						name: 'Completed Review of a Type',
-						value: 'onReviewCompletion',
+						name: 'Completed Review',
+						// Stored value kept so existing workflows still match.
+						value: 'onAgentMessageOrToolResult',
 					},
 					{
-						name: 'Completed Review for an Agent',
-						// legacy value name to avoid breaking changes
-						value: 'onAgentMessageOrToolResult',
+						name: 'Completed Review of a Type (Legacy)',
+						value: 'onReviewCompletion',
+						displayOptions: {
+							show: featureOff,
+						},
 					},
 					{
 						name: 'Submitted Trigger Form',
@@ -128,35 +207,42 @@ export class GotoHumanTrigger implements INodeType {
 				},
 			},
 			{
+				displayName: 'Agent',
+				name: 'agentID',
+				type: 'resourceLocator',
+				description:
+					'Choose an agent from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+				default: { mode: 'list', value: '' },
+				required: true,
+				modes: agentModes,
+				displayOptions: {
+					show: {
+						triggerOn: ['onReviewCompletion', 'onAgentMessageOrToolResult', 'onTriggerFormSubmission'],
+					},
+				},
+			},
+			{
 				displayName: 'Review Type',
 				name: 'reviewTemplateID',
 				type: 'resourceLocator',
 				description:
-					'Choose a review type from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-				default: { mode: 'list', value: '' },
+					'Choose one of the agent\'s review types from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+				default: {
+					mode: 'list',
+					value: ANY_REVIEW_FOR_AGENT,
+					cachedResultName: ANY_REVIEW_FOR_AGENT_LABEL,
+				},
 				required: true,
-				modes: [
-					{
-						displayName: 'From List',
-						name: 'list',
-						type: 'list',
-						placeholder: 'Select a review type...',
-						typeOptions: {
-							searchListMethod: 'searchReviewTemplates',
-							searchable: true,
-						},
-					},
-					{
-						displayName: 'ID',
-						name: 'id',
-						type: 'string',
-						hint: 'Enter an ID',
-						placeholder: 'e.g. FjbxGtNfPIuDdRm55eqK',
-					},
-				],
+				typeOptions: {
+					loadOptionsDependsOn: ['agentID.value'],
+				},
+				modes: reviewTypeModes,
 				displayOptions: {
 					show: {
-						triggerOn: ['onReviewCompletion'],
+						triggerOn: ['onReviewCompletion', 'onAgentMessageOrToolResult'],
+					},
+					hide: {
+						agentID: [''],
 					},
 				},
 			},
@@ -165,64 +251,19 @@ export class GotoHumanTrigger implements INodeType {
 				name: 'triggerFormID',
 				type: 'resourceLocator',
 				description:
-					'Choose a trigger form from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+					'Choose one of this agent\'s trigger forms from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
 				default: { mode: 'list', value: '' },
 				required: true,
-				modes: [
-					{
-						displayName: 'From List',
-						name: 'list',
-						type: 'list',
-						placeholder: 'Select a trigger form...',
-						typeOptions: {
-							searchListMethod: 'searchTriggerForms',
-							searchable: true,
-						},
-					},
-					{
-						displayName: 'ID',
-						name: 'id',
-						type: 'string',
-						hint: 'Enter an ID',
-						placeholder: 'e.g. FjbxGtNfPIuDdRm55eqK',
-					},
-				],
+				typeOptions: {
+					loadOptionsDependsOn: ['agentID.value'],
+				},
+				modes: triggerFormModes,
 				displayOptions: {
 					show: {
 						triggerOn: ['onTriggerFormSubmission'],
 					},
-				},
-			},
-			{
-				displayName: 'Agent',
-				name: 'agentID',
-				type: 'resourceLocator',
-				description:
-					'Choose an agent from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-				default: { mode: 'list', value: '' },
-				required: true,
-				modes: [
-					{
-						displayName: 'From List',
-						name: 'list',
-						type: 'list',
-						placeholder: 'Select an agent...',
-						typeOptions: {
-							searchListMethod: 'searchAgents',
-							searchable: true,
-						},
-					},
-					{
-						displayName: 'ID',
-						name: 'id',
-						type: 'string',
-						hint: 'Enter an ID',
-						placeholder: 'e.g. Y5XrpfmvpKcdJzKYLX2M',
-					},
-				],
-				displayOptions: {
-					show: {
-						triggerOn: ['onAgentMessageOrToolResult'],
+					hide: {
+						agentID: [''],
 					},
 				},
 			},
@@ -247,13 +288,28 @@ export class GotoHumanTrigger implements INodeType {
 				this: ILoadOptionsFunctions,
 				filter?: string,
 			): Promise<INodeListSearchResult> {
-				return fetchN8nFormsListSearch.call(this, filter);
+				const agentId = locatorValue(this.getCurrentNodeParameter('agentID'));
+				if (!agentId) {
+					throw new NodeOperationError(this.getNode(), 'Select an agent first.');
+				}
+				const forms = await fetchN8nFormsListSearch.call(this, filter, { agentId });
+				// Legacy "Completed Review of a Type" registers on one form, so it has no "any".
+				const triggerOn = this.getCurrentNodeParameter('triggerOn') as string;
+				if (filter || triggerOn === 'onReviewCompletion') return forms;
+				return { results: withAnyReview(forms.results) };
 			},
 			async searchTriggerForms(
 				this: ILoadOptionsFunctions,
 				filter?: string,
 			): Promise<INodeListSearchResult> {
-				return fetchN8nFormsListSearch.call(this, filter, { onlyTriggerForms: true });
+				const agentId = locatorValue(this.getCurrentNodeParameter('agentID'));
+				if (!agentId) {
+					throw new NodeOperationError(this.getNode(), 'Select an agent first.');
+				}
+				return fetchN8nFormsListSearch.call(this, filter, {
+					onlyTriggerForms: true,
+					agentId,
+				});
 			},
 			async searchAgents(
 				this: ILoadOptionsFunctions,

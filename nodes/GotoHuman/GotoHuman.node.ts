@@ -1,6 +1,6 @@
 import { INodeType, INodeTypeDescription, NodeConnectionTypes, ILoadOptionsFunctions, INodeListSearchResult, IHttpRequestOptions, NodeOperationError, ResourceMapperFields, IDataObject, jsonParse, ResourceMapperField, ResourceMapperValue, IWebhookFunctions, IWebhookResponseData, IExecuteFunctions, NodeApiError, JsonObject } from 'n8n-workflow';
 
-import { BASE_URL, gotoHumanWebhookMethods } from './helpers';
+import { BASE_URL, fetchN8nFormsListSearch, gotoHumanWebhookMethods, locatorValue } from './helpers';
 
 export class GotoHuman implements INodeType {
 	description: INodeTypeDescription = {
@@ -131,6 +131,9 @@ export class GotoHuman implements INodeType {
 				required: true,
 				description: 'Choose a review type from the list. Read the <a href="https://docs.gotohuman.com/create-template">docs</a>.',
 				default: { mode: 'list', value: '' },
+				typeOptions: {
+					loadOptionsDependsOn: ['agentID.value'],
+				},
 				modes: [
 					{
 						displayName: 'From List',
@@ -232,8 +235,7 @@ export class GotoHuman implements INodeType {
 			name: 'sessionId',
 			type: 'string',
 			default: '',
-			// eslint-disable-next-line n8n-nodes-base/node-param-description-miscased-id
-			description: 'Send to connect various events and reviews of the same session/run. Read the <a href="https://docs.gotohuman.com/api-reference/request-review#param-session-id">docs</a>.',
+			description: 'Send to connect various events and reviews of the same session/run. Read the <a href="https://docs.gotohuman.com/api-reference/request-review#param-session-ID">docs</a>.',
 			displayOptions: {
 				show: {
 					resource: ['reviewRequest'],
@@ -495,38 +497,11 @@ export class GotoHuman implements INodeType {
 				this: ILoadOptionsFunctions,
 				filter?: string,
 			): Promise<INodeListSearchResult> {
-
-				interface ReviewTemplateForm {
-					value: string;
-					label: string;
+				const agentId = locatorValue(this.getCurrentNodeParameter('agentID'));
+				if (!agentId) {
+					throw new NodeOperationError(this.getNode(), 'Select an agent first.');
 				}
-
-				interface ReviewTemplatesResponse {
-					forms: ReviewTemplateForm[];
-				}
-
-				const options: IHttpRequestOptions = {
-					method: 'GET',
-					url: `${BASE_URL}/fetchN8nForms`,
-					json: true,
-				};
-
-				const reviewTemplates: ReviewTemplatesResponse = await this.helpers.httpRequestWithAuthentication.call(this, 'gotoHumanApi', options);
-
-				if (reviewTemplates === undefined) {
-					throw new NodeOperationError(this.getNode(), 'No review types found. Please create one first in our web app.');
-				}
-
-				return {
-					results: (reviewTemplates?.forms || [])
-						.filter(
-							(template) => !filter || template.label.toLowerCase().includes(filter.toLowerCase()),
-						)
-						.map((template) => ({
-							name: template.label,
-							value: template.value,
-						})),
-				};
+				return fetchN8nFormsListSearch.call(this, filter, { agentId });
 			},
 		},
 		resourceMapping: {
