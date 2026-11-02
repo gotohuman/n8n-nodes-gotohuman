@@ -677,9 +677,14 @@ export class GotoHuman implements INodeType {
 				const sessionId = this.getNodeParameter('sessionId', i) as string;
 				if (sessionId) body.sessionId = sessionId;
 				if (operation === 'sendAndWait') {
-					const resumeUrl = this.evaluateExpression('{{ $execution?.resumeUrl }}', i) as string;
-					const nodeId = this.evaluateExpression('{{ $nodeId }}', i) as string;
-					body.webhookUrl = `${resumeUrl}/${nodeId}`;
+					// n8n 1.107+ supports signed resume URLs. Older versions only expose $execution.resumeUrl.
+					if (typeof this.getSignedResumeUrl === 'function') {
+						body.webhookUrl = this.getSignedResumeUrl();
+					} else {
+						const resumeUrl = this.evaluateExpression('{{ $execution?.resumeUrl }}', i) as string;
+						const nodeId = this.evaluateExpression('{{ $nodeId }}', i) as string;
+						body.webhookUrl = `${resumeUrl}/${nodeId}`;
+					}
 				}
 					const options: IHttpRequestOptions = {
 						method: 'POST',
