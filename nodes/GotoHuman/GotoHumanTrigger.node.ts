@@ -25,6 +25,25 @@ import { getSigningSecretFormatError, verifyWebhookSignature } from './webhook-h
 
 const featureOff = { '@feature': [{ _cnd: { not: REVIEW_CONFIG_WEBHOOKS_FEATURE } }] };
 
+const triggerOnOptions = [
+	{
+		name: 'Completed Review',
+		// Stored value kept so existing workflows still match.
+		value: 'onAgentMessageOrToolResult',
+	},
+	{
+		name: 'Completed Review of a Type (Legacy)',
+		value: 'onReviewCompletion',
+		displayOptions: {
+			show: featureOff,
+		},
+	},
+	{
+		name: 'Submitted Trigger Form',
+		value: 'onTriggerFormSubmission',
+	},
+];
+
 const agentModes = [
 	{
 		displayName: 'From List',
@@ -149,26 +168,24 @@ export class GotoHumanTrigger implements INodeType {
 				name: 'triggerOn',
 				type: 'options',
 				required: true,
-				// Saved workflows keep their stored value. New nodes start on Completed Review.
+				// Version 1 nodes omitted this value when it was the default.
+				default: 'onReviewCompletion',
+				options: triggerOnOptions,
+				displayOptions: {
+					show: { '@version': [1] },
+				},
+			},
+			{
+				displayName: 'Trigger On',
+				name: 'triggerOn',
+				type: 'options',
+				required: true,
+				// New nodes are version 2 and start on Completed Review.
 				default: 'onAgentMessageOrToolResult',
-				options: [
-					{
-						name: 'Completed Review',
-						// Stored value kept so existing workflows still match.
-						value: 'onAgentMessageOrToolResult',
-					},
-					{
-						name: 'Completed Review of a Type (Legacy)',
-						value: 'onReviewCompletion',
-						displayOptions: {
-							show: featureOff,
-						},
-					},
-					{
-						name: 'Submitted Trigger Form',
-						value: 'onTriggerFormSubmission',
-					},
-				],
+				options: triggerOnOptions,
+				displayOptions: {
+					show: { '@version': [{ _cnd: { gte: 2 } }] },
+				},
 			},
 			{
 				displayName:
